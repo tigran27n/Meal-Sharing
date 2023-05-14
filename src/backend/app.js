@@ -21,10 +21,76 @@ app.use(cors());
 
 router.use("/meals", mealsRouter);
 
+const knex = require("./database");
+
+router.get("/all-meals", async (request, response) => {
+  try {
+    const allMeals = await knex("Meal").select("*").orderBy('id', 'desc');
+    response.json(allMeals);
+  }
+  catch (error) {
+    throw error;
+  }
+});
+
+router.get("/future-meals", async (request, response) => {
+  try {
+    const futureMeals = await knex("Meal").select("*").where("created_date", '>=', '2023-01-01');
+    response.json(futureMeals);
+  } 
+  catch (error) {
+    throw error;
+  }
+});
+
+router.get("/past-meals", async (request, response) => {
+  try {
+    const pastMeals = await knex("Meal").select("*").where("created_date", '<=', '2023-01-01');
+    response.json(pastMeals);
+  } 
+  catch (error) {
+    throw error;
+  }
+});
+
+router.get("/last-meal", async (request, response) => {
+  try {
+    const maxIdQuery = await knex('Meal').max('id as maxId');
+    const maxId = maxIdQuery[0].maxId;
+
+    if (maxId === null) {
+      response.status(404).json({ error: "No meals found" });
+    } else {
+      const lastMeal = await knex("Meal").select("*").where("id", maxId);
+      response.json(lastMeal[0]);
+    }
+  } 
+  catch (error) {
+    throw error;
+  }
+});
+
+router.get("/first-meal", async (request, response) => {
+  try {
+    const minIdQuery = await knex('Meal').min('id as minId');
+    const minId = minIdQuery[0].minId;
+
+    if (minId === null) {
+      response.status(404).json({ error: "No meals found" });
+    } else {
+      const firstMeal = await knex("Meal").select("*").where("id", minId);
+      response.json(firstMeal[0]);
+    }
+  }
+  catch (error) {
+    throw error;
+  }
+});
+
 if (process.env.API_PATH) {
   app.use(process.env.API_PATH, router);
 } else {
-  throw "API_PATH is not set. Remember to set it in your .env file"
+  throw "API_PATH is not set. Remember to set it in your .env file";
 }
 
 // for the frontend. Will first be covered in the react class
