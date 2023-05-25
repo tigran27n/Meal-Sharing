@@ -2,100 +2,62 @@ const express = require("express");
 const app = express();
 const router = express.Router();
 const path = require("path");
-
-const mealsRouter = require("./api/meals");
-const buildPath = path.join(__dirname, "../../dist");
-const port = process.env.PORT || 3000;
+const dotenv = require("dotenv");
 const cors = require("cors");
+const knex = require("knex");
 
-// For week4 no need to look into this!
-// Serve the built client html
-app.use(express.static(buildPath));
+// Load environment variables from .env file
+dotenv.config();
 
-// Parse URL-encoded bodies (as sent by HTML forms)
+// Middleware
 app.use(express.urlencoded({ extended: true }));
-// Parse JSON bodies (as sent by API clients)
 app.use(express.json());
-
 app.use(cors());
 
+// Database connection
+const db = knex({
+  client: "mysql",
+  connection: {
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
+    port: process.env.DB_PORT,
+  },
+});
+
+// Define routes
+const mealsRouter = require("./api/meals");
+const reservationsRouter = require("./api/reservations");
+
 router.use("/meals", mealsRouter);
+router.use("/reservations", reservationsRouter);
 
-const knex = require("./database");
-
-router.get("/all-meals", async (request, response) => {
+router.get("/all-meals", async (req, res) => {
   try {
-    const allMeals = await knex("Meal").select("*").orderBy('id', 'desc');
-    response.json(allMeals);
-  }
-  catch (error) {
+    const allMeals = await db("meals").select("*").orderBy("id", "desc");
+    res.json(allMeals);
+  } catch (error) {
     throw error;
   }
 });
 
-router.get("/future-meals", async (request, response) => {
-  try {
-    const futureMeals = await knex("Meal").select("*").where("created_date", '>=', '2023-01-01');
-    response.json(futureMeals);
-  } 
-  catch (error) {
-    throw error;
-  }
-});
+// Add more routes here...
 
-router.get("/past-meals", async (request, response) => {
-  try {
-    const pastMeals = await knex("Meal").select("*").where("created_date", '<=', '2023-01-01');
-    response.json(pastMeals);
-  } 
-  catch (error) {
-    throw error;
-  }
-});
+// Use the router
+app.use(process.env.API_PATH, router);
 
-router.get("/last-meal", async (request, response) => {
-  try {
-    const maxIdQuery = await knex('Meal').max('id as maxId');
-    const maxId = maxIdQuery[0].maxId;
-
-    if (maxId === null) {
-      response.status(404).json({ error: "No meals found" });
-    } else {
-      const lastMeal = await knex("Meal").select("*").where("id", maxId);
-      response.json(lastMeal[0]);
-    }
-  } 
-  catch (error) {
-    throw error;
-  }
-});
-
-router.get("/first-meal", async (request, response) => {
-  try {
-    const minIdQuery = await knex('Meal').min('id as minId');
-    const minId = minIdQuery[0].minId;
-
-    if (minId === null) {
-      response.status(404).json({ error: "No meals found" });
-    } else {
-      const firstMeal = await knex("Meal").select("*").where("id", minId);
-      response.json(firstMeal[0]);
-    }
-  }
-  catch (error) {
-    throw error;
-  }
-});
-
-if (process.env.API_PATH) {
-  app.use(process.env.API_PATH, router);
-} else {
-  throw "API_PATH is not set. Remember to set it in your .env file";
-}
-
-// for the frontend. Will first be covered in the react class
+// Serve the client
+const buildPath = path.join(__dirname, "../../dist");
+app.use(express.static(buildPath));
 app.use("*", (req, res) => {
   res.sendFile(path.join(`${buildPath}/index.html`));
+});
+
+// Start the server
+const port = process.env.API_PORT || 5000;
+app.listen(port, () => {
+  console.log(`Server is running on port ${port}`);
 });
 
 module.exports = app;
